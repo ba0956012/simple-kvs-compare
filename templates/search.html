@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>搜尋比較</title>
+    <style>
+        body {
+            font-family: "Segoe UI", sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 2rem;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+        }
+
+        input[type="text"] {
+            width: 280px;
+            padding: 0.6rem;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 0.6rem 1rem;
+            font-size: 1rem;
+            margin-left: 0.5rem;
+            cursor: pointer;
+        }
+
+        #loading {
+            margin-top: 1rem;
+            color: #2c7be5;
+            font-style: italic;
+            display: none;
+        }
+
+        #result-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .result-column {
+            flex: 1 1 45%;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .result-column h2 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.5rem;
+        }
+
+        .card {
+            background-color: #f0f4ff;
+            margin-bottom: 0.75rem;
+            padding: 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .card:hover {
+            background-color: #e2ebff;
+        }
+
+        .card-title {
+            font-weight: bold;
+        }
+
+        .details {
+            display: none;
+            background: #fff;
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .result-column {
+                flex: 1 1 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 關鍵字 vs 向量查詢比較</h1>
+    <input id="queryInput" type="text" placeholder="輸入查詢關鍵字">
+    <button onclick="search()">搜尋</button>
+    <div id="loading">查詢中…</div>
+
+    <div id="result-container">
+        <div class="result-column">
+            <h2>🔍 關鍵字查詢結果</h2>
+            <div id="keywordResults"></div>
+        </div>
+        <div class="result-column">
+            <h2>🧠 向量查詢結果</h2>
+            <div id="vectorResults"></div>
+        </div>
+    </div>
+
+    <script>
+        async function search() {
+            const q = document.getElementById("queryInput").value.trim();
+            if (!q) return;
+
+            document.getElementById("loading").style.display = "block";
+            document.getElementById("keywordResults").innerHTML = "";
+            document.getElementById("vectorResults").innerHTML = "";
+
+            try {
+                const res = await fetch("/api/search", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ q })
+                });
+
+                const data = await res.json();
+                displayResults("keywordResults", data.keyword_results);
+                displayResults("vectorResults", data.vector_results);
+            } catch (error) {
+                alert("查詢發生錯誤，請稍後再試");
+            } finally {
+                document.getElementById("loading").style.display = "none";
+            }
+        }
+
+        function displayResults(containerId, results) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = "";
+
+            if (!results || results.length === 0) {
+                container.innerHTML = "<p>無結果</p>";
+                return;
+            }
+
+            results.forEach((item, index) => {
+                const martName = item._source.martName;
+                const desc = item._source.description || "無描述";
+                const brand = item._source.brandForQuery || "無品牌";
+                const feature = item._source.feature || "無 feature";
+
+                const div = document.createElement("div");
+                div.className = "card";
+
+                div.innerHTML = `
+                    <div class="card-title">
+                        ${index + 1}. ${martName}
+                    </div>
+                    <div class="details">
+                        <p><strong>描述：</strong>${desc}</p>
+                        <p><strong>品牌：</strong>${brand}</p>
+                        <p><strong>Feature：</strong>${feature}</p>
+                    </div>
+                `;
+
+                div.addEventListener("click", () => {
+                    const details = div.querySelector(".details");
+                    details.style.display = details.style.display === "block" ? "none" : "block";
+                });
+
+                container.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>

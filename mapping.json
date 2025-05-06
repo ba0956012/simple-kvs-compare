@@ -1,0 +1,176 @@
+{
+    "settings": {
+        "index.knn": true,
+        "analysis": {
+            "tokenizer": {
+                "bigram_tokenizer": {
+                    "type": "nGram",
+                    "min_gram": 2,
+                    "max_gram": 2,
+                    "token_chars": [
+                        "letter",
+                        "digit"
+                    ]
+                }
+            },
+            "analyzer": {
+                "bigram_analyzer": {
+                    "type": "custom",
+                    "tokenizer": "bigram_tokenizer",
+                    "filter": [
+                        "lowercase"
+                    ]
+                }
+            }
+        }
+    },
+    "mappings": {
+        "properties": {
+            "ageGroup": {
+                "type": "keyword"
+            },
+            "brand": {
+                "type": "keyword",
+                "ignore_above": 512
+            },
+            "brandForQuery": {
+                "type": "text",
+                "analyzer": "bigram_analyzer"
+            },
+            "categoryLevel1": {
+                "type": "keyword"
+            },
+            "categoryLevel1Data": {
+                "type": "keyword"
+            },
+            "categoryLevel1Name": {
+                "type": "text",
+                "analyzer": "bigram_analyzer"
+            },
+            "categoryLevel2": {
+                "type": "keyword"
+            },
+            "categoryLevel2Data": {
+                "type": "keyword"
+            },
+            "categoryLevel2Name": {
+                "type": "text",
+                "analyzer": "bigram_analyzer"
+            },
+            "categoryLevel3": {
+                "type": "keyword"
+            },
+            "categoryLevel3Data": {
+                "type": "keyword"
+            },
+            "categoryLevel3Name": {
+                "type": "text",
+                "analyzer": "bigram_analyzer"
+            },
+            "channel": {
+                "type": "integer"
+            },
+            "compositeTags": {
+                "type": "text",
+                "analyzer": "bigram_analyzer"
+            },
+            "couponChannels": {
+                "type": "keyword",
+                "null_value": "None"
+            },
+            "description": {
+                "type": "text",
+                "analyzer": "bigram_analyzer"
+            },
+            "endAt": {
+                "type": "date"
+            },
+            "feature": {
+                "type": "text",
+                "analyzer": "bigram_analyzer"
+            },
+            "isAccumulatedBonus": {
+                "type": "boolean"
+            },
+            "isBonusUsed": {
+                "type": "boolean"
+            },
+            "isDiscountPrice": {
+                "type": "boolean"
+            },
+            "isGifts": {
+                "type": "boolean"
+            },
+            "isSearchable": {
+                "type": "integer",
+                "null_value": 1
+            },
+            "isShippingFee": {
+                "type": "boolean"
+            },
+            "keyword": {
+                "type": "text"
+            },
+            "keywords": {
+                "type": "keyword"
+            },
+            "martId": {
+                "type": "keyword"
+            },
+            "martName": {
+                "type": "text",
+                "analyzer": "bigram_analyzer"
+            },
+            "martNameAnalyzeByIK": {
+                "type": "text",
+                "analyzer": "bigram_analyzer"
+            },
+            "paymentType": {
+                "type": "keyword"
+            },
+            "price": {
+                "type": "integer"
+            },
+            "priority": {
+                "type": "integer"
+            },
+            "productType": {
+                "type": "text",
+                "analyzer": "bigram_analyzer"
+            },
+            "saleCount": {
+                "type": "integer"
+            },
+            "salePrice": {
+                "type": "integer"
+            },
+            "shippingType": {
+                "type": "keyword",
+                "null_value": "None"
+            },
+            "startAt": {
+                "type": "date"
+            },
+            "status": {
+                "type": "integer"
+            },
+            "tags": {
+                "type": "text",
+                "analyzer": "bigram_analyzer"
+            },
+            "embedding": {
+                "type": "knn_vector",
+                "dimension": 1024,
+                "method": {
+                    "engine": "faiss",
+                    "space_type": "l2",
+                    "name": "hnsw",
+                    "parameters": {}
+                }
+            },
+            "index_num": {
+                "type": "keyword"
+            }
+        }
+    }
+}
