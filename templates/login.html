@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2em; max-width: 400px; margin: auto; }
+    input { display: block; width: 100%; margin: 1em 0; padding: 0.5em; }
+    button { padding: 0.5em 1em; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h2>Login</h2>
+  <input type="text" id="username" placeholder="Username">
+  <input type="password" id="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+  <p class="error" id="error"></p>
+
+  <script>
+    async function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const error = document.getElementById("error");
+      error.textContent = "";
+
+      const formData = new URLSearchParams();
+      formData.append("username", username);
+      formData.append("password", password);
+
+      try {
+        const res = await fetch("/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: formData
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Login failed");
+
+        localStorage.setItem("access_token", data.access_token);
+        window.location.href = "/";
+      } catch (err) {
+        error.textContent = err.message;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-requests
-requests-aws4auth
-python-dotenv
-botocore
-jinja2
-pydantic

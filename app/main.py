@@ -12,6 +12,14 @@ from botocore.awsrequest import AWSRequest
 from botocore.credentials import Credentials
 from requests_aws4auth import AWS4Auth
 
+from fastapi import FastAPI, Request, Depends
+from fastapi.responses import HTMLResponse, JSONResponse
+from app.routes import auth_routes, user_routes
+from app.database import Base, engine
+from app.auth import get_current_user
+import requests
+import json
+
 
 load_dotenv()
 
@@ -29,12 +37,20 @@ OPENSEARCH_AUTH = AWS4Auth(
     OPENSEARCH_ACCESS_KEAY, OPENSEARCH_SECRET_KEY, OPENSEARCH_REGION, OPENSEARCH_SERVICE
 )
 
-app = FastAPI()
+
 templates = Jinja2Templates(directory="templates")
+
+# 建立資料表
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI()
+app.include_router(auth_routes.router, prefix="/auth")
+app.include_router(user_routes.router, prefix="/users")
 
 
 class QueryBody(BaseModel):
     q: str
+    user: str = Depends(get_current_user)
 
 
 def get_titan_embedding(text: str):
@@ -43,19 +59,19 @@ def get_titan_embedding(text: str):
 
     aws_request = AWSRequest(
         method="POST",
-        url=f'https://bedrock-runtime.{BEDROCK_REGION}.amazonaws.com/model/amazon.titan-embed-text-v2:0/invoke',
+        url=f"https://bedrock-runtime.{BEDROCK_REGION}.amazonaws.com/model/amazon.titan-embed-text-v2:0/invoke",
         data=body,
         headers={
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "Host": f'bedrock-runtime.{BEDROCK_REGION}.amazonaws.com',
+            "Host": f"bedrock-runtime.{BEDROCK_REGION}.amazonaws.com",
         },
     )
 
     SigV4Auth(BEDROCK_CREDENTIAL, "bedrock", BEDROCK_REGION).add_auth(aws_request)
 
     response = requests.post(
-        url=f'https://bedrock-runtime.{BEDROCK_REGION}.amazonaws.com/model/amazon.titan-embed-text-v2:0/invoke',
+        url=f"https://bedrock-runtime.{BEDROCK_REGION}.amazonaws.com/model/amazon.titan-embed-text-v2:0/invoke",
         headers=dict(aws_request.headers),
         data=body,
     )
@@ -119,7 +135,7 @@ def vector_query(q, size=100):
 
 
 @app.post("/api/search", response_class=JSONResponse)
-async def search_api(body: QueryBody):
+async def search_api(body: QueryBody, user: str = Depends(get_current_user)):
     q = body.q
     if not q:
         return {"keyword_results": [], "vector_results": []}
@@ -152,6 +168,18 @@ async def search_api(body: QueryBody):
     }
 
 
+# 登入頁面
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+# 搜尋頁面（登入後可見）
 @app.get("/", response_class=HTMLResponse)
 async def search_page(request: Request):
     return templates.TemplateResponse("search.html", {"request": request})
+
+
+@app.get("/change-password", response_class=HTMLResponse)
+async def change_password_page(request: Request):
+    return templates.TemplateResponse("change_password.html", {"request": request})

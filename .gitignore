@@ -155,4 +155,5 @@ notebooks/
 .devcontainer
 
 .DS_Store
+*.db
 

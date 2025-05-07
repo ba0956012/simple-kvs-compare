@@ -1,3 +1,9 @@
+<script>
+    if (!localStorage.getItem("access_token")) {
+      window.location.href = "/login";
+    }
+</script>
+
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -91,9 +97,19 @@
                 flex: 1 1 100%;
             }
         }
+
+        .logout-btn {
+            position: absolute;
+            top: 1rem;
+            right: 2rem;
+        }
     </style>
 </head>
 <body>
+    <div class="logout-btn">
+        <button onclick="logout()">登出</button>
+    </div>
+
     <h1>🔍 關鍵字 vs 向量查詢比較</h1>
     <input id="queryInput" type="text" placeholder="輸入查詢關鍵字">
     <button onclick="search()">搜尋</button>
@@ -120,9 +136,13 @@
             document.getElementById("vectorResults").innerHTML = "";
 
             try {
+                const token = localStorage.getItem("access_token");
                 const res = await fetch("/api/search", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
                     body: JSON.stringify({ q })
                 });
 
@@ -172,6 +192,11 @@
 
                 container.appendChild(div);
             });
+        }
+
+        function logout() {
+            localStorage.removeItem("access_token");
+            window.location.href = "/login";
         }
     </script>
 </body>
