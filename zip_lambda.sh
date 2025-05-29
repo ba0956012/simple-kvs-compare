@@ -13,6 +13,7 @@ cp -r app $BUILD_DIR/
 cp -r templates $BUILD_DIR/
 cp lambda_function.py $BUILD_DIR/
 cp .env $BUILD_DIR/
+cp normalize_params.json $BUILD_DIR/
 
 # 進入目錄打包
 cd $BUILD_DIR

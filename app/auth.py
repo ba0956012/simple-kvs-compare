@@ -14,8 +14,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 USERS = {
-    "admin": {
-        "hashed_password": "$pbkdf2-sha256$29000$vbfWuleq9V5rLQXgXMuZcw$x9.sOAgjVUggkB9DsXjj/s7lfXuqZrxSJuFDsXILeGU",
+    "senao": {
+        "hashed_password": "$pbkdf2-sha256$29000$kTJGqNWaMyZkTInxvvfemw$/T73n.86jd5XVaPKyWsJoiy4zqVh2B1CwxuPNCoYKZQ",
         "is_superuser": True
     },
     "user1": {

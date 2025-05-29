@@ -23,17 +23,64 @@ BEDROCK_SECRET_KEY = os.getenv("BEDROCK_SECRET_KEY")
 BEDROCK_REGION = os.getenv("BEDROCK_REGION")
 BEDROCK_CREDENTIAL = Credentials(BEDROCK_ACCESS_KEY, BEDROCK_SECRET_KEY)
 
-OPENSEARCH_ACCESS_KEAY = os.getenv("OPENSEARCH_ACCESS_KEY")
+OPENSEARCH_ACCESS_KEY = os.getenv("OPENSEARCH_ACCESS_KEY")
 OPENSEARCH_SECRET_KEY = os.getenv("OPENSEARCH_SECRET_KEY")
 OPENSEARCH_REGION = os.getenv("OPENSEARCH_REGION")
 OPENSEARCH_SERVICE = os.getenv("OPENSEARCH_SERVICE")
 OPENSEARCH_URL = os.getenv("OPENSEARCH_URL")
 OPENSEARCH_AUTH = AWS4Auth(
-    OPENSEARCH_ACCESS_KEAY, OPENSEARCH_SECRET_KEY, OPENSEARCH_REGION, OPENSEARCH_SERVICE
+    OPENSEARCH_ACCESS_KEY, OPENSEARCH_SECRET_KEY, OPENSEARCH_REGION, OPENSEARCH_SERVICE
 )
+
+OPENSEARCH_2_19_ACCESS_KEY = os.getenv("OPENSEARCH_2.19_ACCESS_KEY")
+OPENSEARCH_2_19_SECRET_KEY = os.getenv("OPENSEARCH_2.19_SECRET_KEY")
+OPENSEARCH_2_19_REGION = os.getenv("OPENSEARCH_2.19_REGION")
+OPENSEARCH_2_19_SERVICE = os.getenv("OPENSEARCH_2.19_SERVICE")
+OPENSEARCH_2_19_URL = os.getenv("OPENSEARCH_2.19_URL")
+OPENSEARCH_2_19_AUTH = AWS4Auth(
+    OPENSEARCH_2_19_ACCESS_KEY, OPENSEARCH_2_19_SECRET_KEY, OPENSEARCH_2_19_REGION, OPENSEARCH_2_19_SERVICE
+)
+
+PRODUCT_SEARCH_URL = os.getenv("PRODUCT_SEARCH_URL")
+
+DESCRIPTION_TITAN_EMBEDDING_INDEX = os.getenv("DESCRIPTION_TITAN_EMBEDDING_INDEX")
+MARTNAME_TITAN_EMBEDDING_INDEX = os.getenv("MARTNAME_TITAN_EMBEDDING_INDEX")
+DESCRIPTION_TEXT_SMALL_3_EMBEDDING_INDEX = os.getenv(
+    "DESCRIPTION_TEXT_SMALL_3_EMBEDDING_INDEX"
+)
+DESCRIPTION_TEXT_SMALL_3_INT8_EMBEDDING_INDEX = os.getenv(
+    "DESCRIPTION_TEXT_SMALL_3_INT8_EMBEDDING_INDEX"
+)
+
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_EMB_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMB_DEPLOYMENT")
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
+AZURE_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+NORMALIZE_PARAMS_PATH = os.getenv("NORMALIZE_PARAMS_PATH")
+
+OPENSEARCH_INDICEX_MAPPING = {
+    "description-titan-embedding": DESCRIPTION_TITAN_EMBEDDING_INDEX,
+    "martname-titan-embedding": MARTNAME_TITAN_EMBEDDING_INDEX,
+    "description-text-small-3-embedding": DESCRIPTION_TEXT_SMALL_3_EMBEDDING_INDEX,
+    "description-text-small-3-int8-embedding": DESCRIPTION_TEXT_SMALL_3_INT8_EMBEDDING_INDEX,
+}
+
+def load_normalization_params(json_path=NORMALIZE_PARAMS_PATH):
+    global MIN_VEC, MAX_VEC
+    with open(json_path, 'r') as f:
+        params = json.load(f)
+        MIN_VEC = params['min_vec']
+        MAX_VEC = params['max_vec']
+
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+
+@app.on_event("startup")
+def startup_event():
+    load_normalization_params()
+    print("Loaded normalization parameters.")
 
 # 掛載路由
 app.include_router(auth_routes.router, prefix="/auth")
@@ -42,7 +89,24 @@ app.include_router(user_routes.router, prefix="/users")
 class QueryBody(BaseModel):
     q: str
     user: str = Depends(get_current_user)
+    field: str
 
+
+def get_openai_embedding(text: str):
+
+    payload = {"input": text}
+    body = json.dumps(payload)
+
+    headers = {"Content-Type": "application/json", "Accept": "application/json", "api-key": AZURE_OPENAI_API_KEY}
+
+    response = requests.post(
+        url=f"{AZURE_OPENAI_ENDPOINT}openai/deployments/{AZURE_OPENAI_EMB_DEPLOYMENT}/embeddings?api-version={AZURE_OPENAI_API_VERSION}",
+        headers=headers,
+        data=body,
+    )
+
+    response.raise_for_status()
+    return response.json()["data"][0].get("embedding")
 
 def get_titan_embedding(text: str):
     payload = {"inputText": text}
@@ -71,50 +135,81 @@ def get_titan_embedding(text: str):
     return response.json()["embedding"]
 
 
-def keyword_query(keyword, size=100):
+def get_keyword_query(keyword, size=100):
     return {
+        "sort": 0,
+        "page": 1,
         "size": size,
-        "sort": [{"priority": "asc"}, {"_score": "desc"}, {"_doc": "desc"}],
-        "_source": [
-            "description",
+        "keyword": keyword,
+        "source": [
+            "martId",
             "martName",
-            "brandForQuery",
-            "feature",
-            "isSearchable",
             "priority",
+            "salePrice",
+            "brandForQuery",
+            "categoryLevel1Name",
+            "categoryLevel2Name",
+            "categoryLevel3Name",
+            "feature",
         ],
-        "query": {
-            "bool": {
-                "must": {
-                    "multi_match": {
-                        "query": keyword,
-                        "type": "phrase",
-                        "operator": "AND",
-                        "fields": [
-                            "brandForQuery^200",
-                            "categoryLevel1Name^300",
-                            "categoryLevel2Name^300",
-                            "categoryLevel3Name^300",
-                            "martName^300",
-                            "feature^300",
-                            "martNameAnalyzeByIK",
-                            "martId",
-                            "tags",
-                            "compositeTags",
-                        ],
-                    }
-                },
-                "filter": [{"term": {"isSearchable": 1}}],
-            }
-        },
+        "platform": "ecoms",
     }
 
 
-def vector_query(q, size=100):
+def posprocess_keyword_query(martData):
+    result = []
+    for product_data in martData:
+        doc_id = product_data.get("martId")
+        brand = product_data.get("brandForQuery")
+        name = product_data.get("martName")
+        feature = product_data.get("feature")
+        category1 = product_data.get("categoryLevel1Name")
+        category2 = product_data.get("categoryLevel2Name")
+        category3 = product_data.get("categoryLevel3Name")
+        price = product_data.get("salePrice")
+        product_data["description"] = (
+            f"商品編號 {doc_id}"
+            f"是一款 {brand} 品牌的商品稱為「{name}」。"
+            f"主打特色是 {feature} "
+            f"商品分類為 {' > '.join([c for c in [category1, category2, category3] if c])}，"
+            f"售價為 {price} 元。"
+        )
+        result.append({"_source": product_data})
+    return result
 
-    vector = get_titan_embedding(q)
+
+def quantize_vector_to_int8(vec, min_vec, max_vec):
+    """
+    將 float32 向量（list of float）依據每一維的 min/max 做量化，轉成 int8 向量（list of int）。
+    """
+    quantized = []
+    for v, vmin, vmax in zip(vec, min_vec, max_vec):
+        scale = vmax - vmin
+        if scale == 0:
+            scale = 1.0  # 避免除以零
+
+        normalized = (v - vmin) / scale
+        scaled = int(normalized * 255) - 128
+        clipped = max(-128, min(127, scaled))
+        quantized.append(clipped)
+    
+    return quantized
+
+
+def get_vector_query(q, field, size=100):
+
+    if field == "description-titan-embedding":
+        vector = get_titan_embedding(q)
+    elif field == "martname-titan-embedding":
+        vector = get_titan_embedding(q)
+    elif field == "description-text-small-3-embedding":
+        vector = get_openai_embedding(q)
+    elif field == "description-text-small-3-int8-embedding":
+        vector = get_openai_embedding(q)
+        vector = quantize_vector_to_int8(vector, MIN_VEC, MAX_VEC)
+
     return {
-        "_source": ["description", "martName", "brandForQuery", "feature"],
+        "_source": ["description", "martName", "brandForQuery", "feature", "martId"],
         "size": size,
         "query": {
             "bool": {
@@ -128,30 +223,43 @@ def vector_query(q, size=100):
 @app.post("/api/search", response_class=JSONResponse)
 async def search_api(body: QueryBody, user: str = Depends(get_current_user)):
     q = body.q
+    field = body.field
+
     if not q:
         return {"keyword_results": [], "vector_results": []}
 
-    kw_payload = keyword_query(q)
-    vec_payload = vector_query(q)
+    kw_payload = get_keyword_query(q)
+    vec_payload = get_vector_query(q, field=field)
 
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
     kw_resp = requests.post(
-        OPENSEARCH_URL,
+        PRODUCT_SEARCH_URL,
         headers=headers,
-        auth=OPENSEARCH_AUTH,
         data=json.dumps(kw_payload),
     )
-    vec_resp = requests.post(
-        OPENSEARCH_URL,
-        headers=headers,
-        auth=OPENSEARCH_AUTH,
-        data=json.dumps(vec_payload),
-    )
 
-    keyword_results = kw_resp.json().get("hits", {}).get("hits", [])
+    if field == "description-text-small-3-int8-embedding":
+        vec_resp = requests.post(
+            f"{OPENSEARCH_2_19_URL}/{OPENSEARCH_INDICEX_MAPPING[field]}/_search",
+            headers=headers,
+            auth=OPENSEARCH_2_19_AUTH,
+            data=json.dumps(vec_payload),
+        )
+    else:
+        vec_resp = requests.post(
+            f"{OPENSEARCH_URL}/{OPENSEARCH_INDICEX_MAPPING[field]}/_search",
+            headers=headers,
+            auth=OPENSEARCH_AUTH,
+            data=json.dumps(vec_payload),
+        )
+
+    if kw_resp.text:
+        keyword_results = kw_resp.json().get("martData", [])
+        keyword_results = posprocess_keyword_query(keyword_results)
+    else:
+        keyword_results = []
     vector_results = vec_resp.json().get("hits", {}).get("hits", [])
-
     return {
         "query": q,
         "keyword_results": keyword_results,

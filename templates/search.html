@@ -14,10 +14,15 @@
       font-size: 1.8rem;
       margin-bottom: 1rem;
     }
-    input[type="text"] {
-      width: 280px;
+    input[type="text"], select {
       padding: 0.6rem;
       font-size: 1rem;
+    }
+    input[type="text"] {
+      width: 280px;
+    }
+    select {
+      margin-left: 0.5rem;
     }
     button {
       padding: 0.6rem 1rem;
@@ -92,6 +97,12 @@
 <body>
   <h1>🔍 關鍵字 vs 向量查詢比較</h1>
   <input id="queryInput" type="text" placeholder="輸入查詢關鍵字">
+  <select id="fieldSelect">
+    <option value="description-titan-embedding">description-titan-embedding</option>
+    <option value="martname-titan-embedding">martname-titan-embedding</option>
+    <option value="description-text-small-3-embedding">description-text-small-3-embedding</option>
+    <option value="description-text-small-3-int8-embedding">description-text-small-3-int8-embedding</option>
+  </select>
   <button onclick="search()">搜尋</button>
   <button id="logout" onclick="logout()">登出</button>
   <div id="loading">查詢中…</div>
@@ -141,6 +152,7 @@
   
     async function search() {
       const q = document.getElementById("queryInput").value.trim();
+      const field = document.getElementById("fieldSelect").value;
       if (!q) return;
   
       document.getElementById("loading").style.display = "block";
@@ -155,7 +167,7 @@
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`
           },
-          body: JSON.stringify({ q })
+          body: JSON.stringify({ q, field })
         });
   
         if (res.status === 401) {
@@ -185,9 +197,10 @@
   
       results.forEach((item, index) => {
         const martName = item._source.martName;
-        const desc = item._source.description || "無描述";
-        const brand = item._source.brandForQuery || "無品牌";
-        const feature = item._source.feature || "無 feature";
+        const martId = item._source.martId || " 無 martId";
+        const desc = item._source.description || " 無描述";
+        const brand = item._source.brandForQuery || " 無品牌";
+        const feature = item._source.feature || " 無 feature";
   
         const div = document.createElement("div");
         div.className = "card";
@@ -197,6 +210,11 @@
             ${index + 1}. ${martName}
           </div>
           <div class="details">
+            <p><strong>賣場ID：</strong>
+              <a href="https://online.senao.com.tw/Mart/${martId}" target="_blank" rel="noopener noreferrer">
+                ${martId}
+              </a>
+            </p>
             <p><strong>描述：</strong>${desc}</p>
             <p><strong>品牌：</strong>${brand}</p>
             <p><strong>Feature：</strong>${feature}</p>
